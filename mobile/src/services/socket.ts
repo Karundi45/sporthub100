@@ -1,6 +1,9 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = 'http://10.0.2.2:5000'; // Match backend URL
+// Use the same domain as the API, just remove the /api path.
+const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL 
+  ? process.env.EXPO_PUBLIC_API_URL.replace('/api', '') 
+  : 'http://10.0.2.2:5000';
 
 class SocketService {
   public socket: Socket | null = null;
