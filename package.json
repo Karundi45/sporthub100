@@ -1,0 +1,16 @@
+{
+  "name": "fittrack-pro-workspace",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "mobile"
+  ],
+  "scripts": {
+    "start:backend": "npm run dev --workspace=backend",
+    "start:mobile": "npm run start --workspace=mobile",
+    "dev": "npx concurrently \"npm run start:backend\" \"npm run start:mobile\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
