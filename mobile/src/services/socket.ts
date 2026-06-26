@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 // Use the same domain as the API, just remove the /api path.
 const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL 
   ? process.env.EXPO_PUBLIC_API_URL.replace('/api', '') 
-  : 'http://10.0.2.2:5000';
+  : 'https://sporthub100-1.onrender.com';
 
 class SocketService {
   public socket: Socket | null = null;
