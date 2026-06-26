@@ -1,6 +1,3 @@
-import { Tabs } from 'react-router';
-// Note: Expo Router uses its own Tabs component from 'expo-router', fixing the import:
-// (The previous line was a placeholder to be overwritten anyway)
 import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
