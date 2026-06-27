@@ -10,6 +10,8 @@ import { useAuthStore } from '../src/store/useAuthStore';
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -30,13 +32,16 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === '(auth)';
 
-    if (!token && !inAuthGroup) {
-      // Redirect to login if not authenticated
-      router.replace('/(auth)/login');
-    } else if (token && inAuthGroup) {
-      // Redirect away from login if authenticated
-      router.replace('/(tabs)');
-    }
+    // Safely execute routing with a tiny delay to ensure navigation tree is fully mounted on Android prod
+    setTimeout(() => {
+      if (!token && !inAuthGroup) {
+        // Redirect to login if not authenticated
+        router.replace('/(auth)/login');
+      } else if (token && inAuthGroup) {
+        // Redirect away from login if authenticated
+        router.replace('/(tabs)');
+      }
+    }, 100);
   }, [token, segments, loaded]);
 
   if (!loaded) {
@@ -44,14 +49,16 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
