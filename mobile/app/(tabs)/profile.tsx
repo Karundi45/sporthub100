@@ -195,6 +195,20 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {!isEditing && user?.achievements && user.achievements.length > 0 && (
+          <View style={styles.infoSection}>
+            <Text style={styles.sectionTitle}>Achievements</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.achievementsScroll}>
+              {user.achievements.map((achievement: any, index: number) => (
+                <View key={index} style={styles.achievementBadge}>
+                  <Text style={styles.achievementIcon}>{achievement.icon || '🏅'}</Text>
+                  <Text style={styles.achievementTitle}>{achievement.title}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {!isEditing && (
           <View style={styles.infoSection}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
@@ -448,5 +462,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: 'bold',
+  },
+  achievementsScroll: {
+    flexDirection: 'row',
+  },
+  achievementBadge: {
+    alignItems: 'center',
+    backgroundColor: '#F9F9F9',
+    borderRadius: 16,
+    padding: 16,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    minWidth: 100,
+  },
+  achievementIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  achievementTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    textAlign: 'center',
   },
 });

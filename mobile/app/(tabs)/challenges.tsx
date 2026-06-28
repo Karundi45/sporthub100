@@ -1,6 +1,8 @@
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, Alert } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../src/services/api';
+import { useAuthStore } from '../../src/store/useAuthStore';
 
 interface Challenge {
   _id: string;
@@ -11,7 +13,10 @@ interface Challenge {
   participants: any[];
 }
 
-export default function ChallengesScreen() {
+  const [activeTab, setActiveTab] = React.useState('challenges');
+  const queryClient = useQueryClient();
+  const currentUser = useAuthStore((state) => state.user);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['challenges'],
     queryFn: async () => {
@@ -20,7 +25,25 @@ export default function ChallengesScreen() {
     }
   });
 
-  if (isLoading) {
+  const { data: leaderboardData, isLoading: isLoadingLeaderboard } = useQuery({
+    queryKey: ['leaderboard'],
+    queryFn: async () => {
+      const res = await api.get('/challenges/leaderboard');
+      return res.data;
+    }
+  });
+
+  const joinMutation = useMutation({
+    mutationFn: async (challengeId: string) => {
+      await api.post(`/challenges/${challengeId}/join`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['challenges'] });
+      Alert.alert('Success', 'You have joined the challenge!');
+    }
+  });
+
+  if (isLoading || isLoadingLeaderboard) {
     return <View style={styles.center}><ActivityIndicator size="large" color="#FF9500" /></View>;
   }
 
@@ -28,21 +51,47 @@ export default function ChallengesScreen() {
     return <View style={styles.center}><Text style={styles.errorText}>Error loading challenges.</Text></View>;
   }
 
-  const renderItem = ({ item }: { item: Challenge }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.title}>{item.title}</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{item.type.toUpperCase()}</Text>
+  const renderChallenge = ({ item }: { item: Challenge }) => {
+    const isParticipating = item.participants.some((p: any) => p.user === currentUser?._id);
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.title}>{item.title}</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{item.type.toUpperCase()}</Text>
+          </View>
+        </View>
+        <Text style={styles.description}>{item.description}</Text>
+        
+        <View style={styles.progressContainer}>
+          <View style={styles.progressBarBackground}>
+            <View style={[styles.progressBarFill, { width: '35%' }]} /> 
+          </View>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>{item.participants.length} Participants</Text>
+            {isParticipating ? (
+              <Text style={styles.joinedText}>Joined ✓</Text>
+            ) : (
+              <TouchableOpacity style={styles.joinButton} onPress={() => joinMutation.mutate(item._id)}>
+                <Text style={styles.joinButtonText}>Join</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
-      <Text style={styles.description}>{item.description}</Text>
-      
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBarBackground}>
-          <View style={[styles.progressBarFill, { width: '35%' }]} /> 
-        </View>
-        <Text style={styles.progressText}>{item.participants.length} Participants</Text>
+    );
+  };
+
+  const renderLeaderboardItem = ({ item, index }: { item: any, index: number }) => (
+    <View style={styles.leaderboardRow}>
+      <Text style={styles.rank}>{index + 1}</Text>
+      <View style={styles.leaderboardUser}>
+        <Text style={styles.leaderboardName}>{item.fullName}</Text>
+        <Text style={styles.leaderboardUsername}>@{item.username}</Text>
+      </View>
+      <View style={styles.leaderboardStats}>
+        <Text style={styles.statScore}>{(item.totalDistance / 1000).toFixed(1)} km</Text>
       </View>
     </View>
   );
@@ -50,14 +99,43 @@ export default function ChallengesScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <Text style={styles.largeTitle}>Challenges</Text>
-        <FlatList
-          data={data || []}
-          keyExtractor={(item) => item._id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          showsVerticalScrollIndicator={false}
-        />
+        <Text style={styles.largeTitle}>Compete</Text>
+        
+        <View style={styles.tabContainer}>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'challenges' && styles.activeTab]}
+            onPress={() => setActiveTab('challenges')}
+          >
+            <Text style={[styles.tabText, activeTab === 'challenges' && styles.activeTabText]}>Challenges</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'leaderboard' && styles.activeTab]}
+            onPress={() => setActiveTab('leaderboard')}
+          >
+            <Text style={[styles.tabText, activeTab === 'leaderboard' && styles.activeTabText]}>Leaderboard</Text>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 'challenges' ? (
+          <FlatList
+            data={data || []}
+            keyExtractor={(item) => item._id}
+            renderItem={renderChallenge}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <View style={styles.leaderboardCard}>
+            <FlatList
+              data={leaderboardData || []}
+              keyExtractor={(item) => item._id}
+              renderItem={renderLeaderboardItem}
+              contentContainerStyle={{ paddingBottom: 20 }}
+              showsVerticalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -150,5 +228,105 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#8E8E93',
     fontWeight: '500',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#E5E5EA',
+    borderRadius: 8,
+    padding: 3,
+    marginBottom: 20,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  activeTab: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#8E8E93',
+  },
+  activeTabText: {
+    color: '#000',
+    fontWeight: '600',
+  },
+  leaderboardCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  leaderboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  rank: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FF9500',
+    width: 30,
+  },
+  leaderboardUser: {
+    flex: 1,
+    paddingHorizontal: 12,
+  },
+  leaderboardName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+  },
+  leaderboardUsername: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  leaderboardStats: {
+    alignItems: 'flex-end',
+  },
+  statScore: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E5E5EA',
+    marginLeft: 58,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  joinButton: {
+    backgroundColor: '#FF9500',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  joinButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  joinedText: {
+    color: '#34C759',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });

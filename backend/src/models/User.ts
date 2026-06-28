@@ -49,8 +49,16 @@ const UserSchema: Schema = new Schema(
     },
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    achievements: [{
+      title: String,
+      description: String,
+      icon: String,
+      earnedAt: Date
+    }],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
 export default mongoose.model<IUser>('User', UserSchema);
