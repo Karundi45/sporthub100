@@ -1,9 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert, SafeAreaView, Platform } from 'react-native';
-import MapView, { Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { socketService } from '../../src/services/socket';
 import { useAuthStore } from '../../src/store/useAuthStore';
+
+// Conditionally require react-native-maps only on native platforms to prevent Web crashes
+let MapView: any = View;
+let Polyline: any = View;
+let PROVIDER_DEFAULT: any = null;
+
+if (Platform.OS !== 'web') {
+  const Maps = require('react-native-maps');
+  MapView = Maps.default;
+  Polyline = Maps.Polyline;
+  PROVIDER_DEFAULT = Maps.PROVIDER_DEFAULT;
+}
 
 export default function TrackingScreen() {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
