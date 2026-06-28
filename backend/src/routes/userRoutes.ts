@@ -1,9 +1,12 @@
 import express from 'express';
-import { getUserProfile, updateUserProfile } from '../controllers/userController';
+import { getUserProfile, updateUserProfile, searchUsers, followUser, unfollowUser } from '../controllers/userController';
 import { protect } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
 router.route('/profile').get(protect, getUserProfile).put(protect, updateUserProfile);
+router.route('/search').get(protect, searchUsers);
+router.route('/:id/follow').post(protect, followUser);
+router.route('/:id/unfollow').post(protect, unfollowUser);
 
 export default router;

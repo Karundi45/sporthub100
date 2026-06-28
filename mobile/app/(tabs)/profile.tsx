@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert, SafeAreaView, ScrollView, Image } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import api from '../../src/services/api';
 
 export default function ProfileScreen() {
   const { user, setUser, logout } = useAuthStore();
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     fullName: user?.fullName || '',
@@ -14,6 +16,7 @@ export default function ProfileScreen() {
     fitnessGoals: user?.fitnessGoals?.join(', ') || '',
   });
   const [loading, setLoading] = useState(false);
+  const [workouts, setWorkouts] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -24,8 +27,18 @@ export default function ProfileScreen() {
         weight: user.weight?.toString() || '',
         fitnessGoals: user.fitnessGoals?.join(', ') || '',
       });
+      fetchWorkouts();
     }
   }, [user]);
+
+  const fetchWorkouts = async () => {
+    try {
+      const res = await api.get('/workouts');
+      setWorkouts(res.data);
+    } catch (error) {
+      console.log('Failed to fetch workouts', error);
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -86,6 +99,22 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.username}>@{user?.username}</Text>
           <Text style={styles.email}>{user?.email}</Text>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statCol}>
+              <Text style={styles.statNumber}>{user?.following?.length || 0}</Text>
+              <Text style={styles.statLabel}>Following</Text>
+            </View>
+            <View style={styles.statCol}>
+              <Text style={styles.statNumber}>{user?.followers?.length || 0}</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </View>
+          </View>
+          {!isEditing && (
+            <TouchableOpacity style={styles.findFriendsButton} onPress={() => router.push('/search')}>
+              <Text style={styles.findFriendsText}>Find Friends</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.infoSection}>
@@ -165,6 +194,38 @@ export default function ProfileScreen() {
             )}
           </View>
         </View>
+
+        {!isEditing && (
+          <View style={styles.infoSection}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            {workouts.length === 0 ? (
+              <Text style={styles.emptyText}>No workouts yet. Go track one!</Text>
+            ) : (
+              workouts.map((workout: any) => (
+                <View key={workout._id} style={styles.workoutCard}>
+                  <View style={styles.workoutHeader}>
+                    <Text style={styles.workoutTitle}>{workout.title || workout.activityType}</Text>
+                    <Text style={styles.workoutDate}>{new Date(workout.createdAt).toLocaleDateString()}</Text>
+                  </View>
+                  <View style={styles.workoutStatsRow}>
+                    <View style={styles.workoutStat}>
+                      <Text style={styles.workoutStatValue}>{(workout.distance / 1000).toFixed(2)} km</Text>
+                      <Text style={styles.workoutStatLabel}>Distance</Text>
+                    </View>
+                    <View style={styles.workoutStat}>
+                      <Text style={styles.workoutStatValue}>{Math.floor(workout.duration / 60)} min</Text>
+                      <Text style={styles.workoutStatLabel}>Time</Text>
+                    </View>
+                    <View style={styles.workoutStat}>
+                      <Text style={styles.workoutStatValue}>{workout.calories} kcal</Text>
+                      <Text style={styles.workoutStatLabel}>Calories</Text>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        )}
 
         {!isEditing && (
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -310,5 +371,82 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 17,
     fontWeight: '600',
+  },
+  emptyText: {
+    color: '#8E8E93',
+    fontSize: 15,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    padding: 20,
+  },
+  workoutCard: {
+    backgroundColor: '#F9F9F9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  workoutHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  workoutTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+  },
+  workoutDate: {
+    fontSize: 13,
+    color: '#8E8E93',
+  },
+  workoutStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  workoutStat: {
+    alignItems: 'center',
+  },
+  workoutStatValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+  },
+  workoutStatLabel: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 4,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    marginTop: 20,
+    gap: 40,
+  },
+  statCol: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 4,
+  },
+  findFriendsButton: {
+    marginTop: 20,
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  findFriendsText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 });

@@ -31,9 +31,11 @@ export const getFeed = async (req: AuthRequest, res: Response): Promise<void> =>
   try {
     const { page = 1, limit = 10 } = req.query;
     
-    // In a real app, this would filter by user's following list.
-    // For now, we'll fetch all public posts.
-    const posts = await Post.find()
+    // Fetch posts from users the current user is following, AND the current user's own posts
+    const following = req.user.following || [];
+    const targetUsers = [...following, req.user._id];
+
+    const posts = await Post.find({ user: { $in: targetUsers } })
       .populate('user', 'username fullName profilePicture')
       .populate('workout', 'title distance duration activityType route')
       .populate('comments.user', 'username fullName profilePicture')
@@ -41,7 +43,7 @@ export const getFeed = async (req: AuthRequest, res: Response): Promise<void> =>
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));
 
-    const total = await Post.countDocuments();
+    const total = await Post.countDocuments({ user: { $in: targetUsers } });
 
     res.json({
       posts,
@@ -77,6 +79,39 @@ export const likePost = async (req: AuthRequest, res: Response): Promise<void> =
     await post.save();
 
     res.json(post.likes);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Comment on a post
+// @route   POST /api/posts/:id/comment
+// @access  Private
+export const commentPost = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { text } = req.body;
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      res.status(404).json({ message: 'Post not found' });
+      return;
+    }
+
+    const comment = {
+      user: req.user._id,
+      text,
+      createdAt: new Date(),
+    };
+
+    post.comments.push(comment as any);
+    await post.save();
+
+    const populatedPost = await Post.findById(post._id)
+      .populate('user', 'username fullName profilePicture')
+      .populate('workout', 'title distance duration activityType route')
+      .populate('comments.user', 'username fullName profilePicture');
+
+    res.status(201).json(populatedPost?.comments);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

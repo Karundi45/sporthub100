@@ -41,6 +41,11 @@ export default function AnalyticsScreen() {
               <Text style={styles.statValue}>{(data?.overall?.totalCalories || 0).toFixed(0)}</Text>
               <Text style={styles.statLabel}>Calories</Text>
             </View>
+            <View style={styles.divider} />
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{Math.floor((data?.overall?.totalDuration || 0) / 60)}</Text>
+              <Text style={styles.statLabel}>Mins</Text>
+            </View>
           </View>
         </View>
 
