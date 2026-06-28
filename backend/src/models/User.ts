@@ -11,8 +11,8 @@ export interface IUser extends Document {
   country?: string;
   city?: string;
   birthday?: Date;
-  height?: number; // in cm
-  weight?: number; // in kg
+  height?: number;
+  weight?: number;
   gender?: string;
   fitnessGoals?: string[];
   preferredSports?: string[];
@@ -22,6 +22,8 @@ export interface IUser extends Document {
   };
   followers: mongoose.Types.ObjectId[];
   following: mongoose.Types.ObjectId[];
+  expoPushToken?: string;
+  achievements: { title: string, description: string, icon: string, earnedAt: Date }[];
   createdAt: Date;
   updatedAt: Date;
 }

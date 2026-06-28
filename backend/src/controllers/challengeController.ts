@@ -51,7 +51,7 @@ export const createChallenge = async (req: AuthRequest, res: Response): Promise<
       title,
       description,
       type,
-      target,
+      targetValue: target,
       startDate,
       endDate,
       participants: []

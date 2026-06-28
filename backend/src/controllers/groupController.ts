@@ -62,11 +62,12 @@ export const joinGroup = async (req: AuthRequest, res: Response): Promise<void> 
   }
 };
 
+import mongoose from 'mongoose';
 import Message from '../models/Message';
 
 export const getMessages = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const messages = await Message.find({ group: req.params.id })
+    const messages = await Message.find({ group: new mongoose.Types.ObjectId(req.params.id as string) })
       .populate('sender', 'username fullName profilePicture')
       .sort({ createdAt: 1 })
       .limit(100);
@@ -80,7 +81,7 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
   try {
     const { text } = req.body;
     const message = await Message.create({
-      group: req.params.id,
+      group: new mongoose.Types.ObjectId(req.params.id as string),
       sender: req.user._id,
       text,
     });

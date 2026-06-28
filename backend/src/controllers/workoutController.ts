@@ -60,7 +60,7 @@ export const createWorkout = async (req: Request, res: Response): Promise<void> 
     if (user) {
       const achievementsToAward = [];
       const userAchievements = user.achievements || [];
-      const hasAchievement = (title: string) => userAchievements.some((a) => a.title === title);
+      const hasAchievement = (title: string) => userAchievements.some((a: any) => a.title === title);
 
       if (userAchievements.length === 0 && !hasAchievement('First Steps')) {
         achievementsToAward.push({ title: 'First Steps', description: 'Tracked your very first workout!', icon: '👟', earnedAt: new Date() });

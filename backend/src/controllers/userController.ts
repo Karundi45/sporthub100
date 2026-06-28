@@ -54,11 +54,12 @@ export const updateUserProfile = async (req: Request, res: Response): Promise<vo
 
 export const searchUsers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const keyword = req.query.q
+    const q = req.query.q as string;
+    const keyword = q
       ? {
           $or: [
-            { username: { $regex: req.query.q, $options: 'i' } },
-            { fullName: { $regex: req.query.q, $options: 'i' } },
+            { username: { $regex: q, $options: 'i' } },
+            { fullName: { $regex: q, $options: 'i' } },
           ],
         }
       : {};
