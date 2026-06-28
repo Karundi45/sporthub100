@@ -123,3 +123,19 @@ export const unfollowUser = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({ message: error.message });
   }
 };
+
+export const updatePushToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { pushToken } = req.body;
+    
+    const user = await User.findById((req as any).user._id);
+    if (user) {
+      user.expoPushToken = pushToken;
+      await user.save();
+    }
+    
+    res.json({ message: 'Push token updated successfully' });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
