@@ -61,3 +61,33 @@ export const joinGroup = async (req: AuthRequest, res: Response): Promise<void> 
     res.status(500).json({ message: error.message });
   }
 };
+
+import Message from '../models/Message';
+
+export const getMessages = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const messages = await Message.find({ group: req.params.id })
+      .populate('sender', 'username fullName profilePicture')
+      .sort({ createdAt: 1 })
+      .limit(100);
+    res.json(messages);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const sendMessage = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { text } = req.body;
+    const message = await Message.create({
+      group: req.params.id,
+      sender: req.user._id,
+      text,
+    });
+    
+    const populatedMessage = await Message.findById(message._id).populate('sender', 'username fullName profilePicture');
+    res.status(201).json(populatedMessage);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};

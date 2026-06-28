@@ -95,7 +95,7 @@ export default function SearchScreen() {
         </TouchableOpacity>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search people..."
+          placeholder="Search users, groups, plans..."
           value={query}
           onChangeText={setQuery}
           autoFocus

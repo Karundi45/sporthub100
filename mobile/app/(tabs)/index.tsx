@@ -9,12 +9,14 @@ import api from '../../src/services/api';
 let MapView: any = View;
 let Polyline: any = View;
 let UrlTile: any = View;
+let Marker: any = View;
 
 if (Platform.OS !== 'web') {
   const Maps = require('react-native-maps');
   MapView = Maps.default;
   Polyline = Maps.Polyline;
   UrlTile = Maps.UrlTile;
+  Marker = Maps.Marker;
 }
 
 export default function TrackingScreen() {
@@ -28,6 +30,9 @@ export default function TrackingScreen() {
   const [distance, setDistance] = useState(0); // in meters
   const [duration, setDuration] = useState(0); // in seconds
   const [calories, setCalories] = useState(0);
+  
+  // Real-time
+  const [friendsLocations, setFriendsLocations] = useState<Record<string, { lat: number, lon: number, username: string }>>({});
   
   const { user } = useAuthStore();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -43,9 +48,21 @@ export default function TrackingScreen() {
       let currentLocation = await Location.getCurrentPositionAsync({});
       setLocation(currentLocation);
       socketService.connect();
+
+      socketService.socket?.on('friend_location_update', (data: any) => {
+        setFriendsLocations((prev) => ({
+          ...prev,
+          [data.userId]: {
+            lat: data.location.latitude,
+            lon: data.location.longitude,
+            username: data.username,
+          }
+        }));
+      });
     })();
 
     return () => {
+      socketService.socket?.off('friend_location_update');
       socketService.disconnect();
     };
   }, []);
@@ -99,9 +116,10 @@ export default function TrackingScreen() {
               return [...prev, newPoint];
             });
 
-            if (socketService.socket) {
+            if (socketService.socket && user) {
               socketService.socket.emit('update_location', {
-                userId: user?._id,
+                userId: user._id,
+                username: user.username,
                 location: newPoint,
               });
             }
@@ -220,6 +238,21 @@ export default function TrackingScreen() {
           />
         )}
         <Polyline coordinates={route} strokeColor="#007AFF" strokeWidth={6} lineCap="round" lineJoin="round" />
+        
+        {Object.values(friendsLocations).map((friend, index) => (
+          Platform.OS !== 'web' && (
+            <Marker
+              key={index}
+              coordinate={{ latitude: friend.lat, longitude: friend.lon }}
+              title={friend.username}
+              description="Live Tracking"
+            >
+              <View style={styles.friendMarker}>
+                <Text style={styles.friendMarkerText}>{friend.username.charAt(0).toUpperCase()}</Text>
+              </View>
+            </Marker>
+          )
+        ))}
       </MapView>
 
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
@@ -378,5 +411,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  friendMarker: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#FF9500',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  friendMarkerText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });

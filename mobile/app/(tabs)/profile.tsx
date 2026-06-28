@@ -242,6 +242,12 @@ export default function ProfileScreen() {
         )}
 
         {!isEditing && (
+          <TouchableOpacity style={styles.plansButton} onPress={() => router.push('/plans')}>
+            <Text style={styles.plansButtonText}>Training Plans & Nutrition 🥗</Text>
+          </TouchableOpacity>
+        )}
+
+        {!isEditing && (
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>
@@ -485,5 +491,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
     textAlign: 'center',
+  },
+  plansButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginVertical: 20,
+    marginHorizontal: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  plansButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

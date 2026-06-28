@@ -49,6 +49,7 @@ const UserSchema: Schema = new Schema(
     },
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    expoPushToken: { type: String },
     achievements: [{
       title: String,
       description: String,

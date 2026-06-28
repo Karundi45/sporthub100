@@ -52,6 +52,36 @@ app.use((req: any, res, next) => {
 io.on('connection', (socket) => {
   console.log('New client connected', socket.id);
 
+  socket.on('join_group', (groupId) => {
+    socket.join(groupId);
+    console.log(`Socket ${socket.id} joined group ${groupId}`);
+  });
+
+  socket.on('leave_group', (groupId) => {
+    socket.leave(groupId);
+    console.log(`Socket ${socket.id} left group ${groupId}`);
+  });
+
+  socket.on('send_message', (data) => {
+    // data should contain { groupId, message }
+    io.to(data.groupId).emit('receive_message', data.message);
+  });
+
+  socket.on('typing', (data) => {
+    // data should contain { groupId, username }
+    socket.to(data.groupId).emit('user_typing', data);
+  });
+
+  socket.on('stop_typing', (data) => {
+    socket.to(data.groupId).emit('user_stopped_typing', data);
+  });
+
+  socket.on('update_location', (data) => {
+    // data should contain { userId, latitude, longitude, username }
+    // Broadcast to everyone else (in a real app, only broadcast to friends)
+    socket.broadcast.emit('friend_location_update', data);
+  });
+
   socket.on('disconnect', () => {
     console.log('Client disconnected', socket.id);
   });
