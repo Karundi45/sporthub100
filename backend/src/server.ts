@@ -9,6 +9,8 @@ import connectDB from './config/db';
 
 // Routes
 import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
+import workoutRoutes from './routes/workoutRoutes';
 import postRoutes from './routes/postRoutes';
 import groupRoutes from './routes/groupRoutes';
 import challengeRoutes from './routes/challengeRoutes';
@@ -61,6 +63,8 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/workouts', workoutRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/challenges', challengeRoutes);

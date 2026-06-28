@@ -38,11 +38,11 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
-      {/* Exclude old 'two' screen if it exists by ignoring it */}
       <Tabs.Screen
-        name="two"
+        name="profile"
         options={{
-          href: null,
+          title: 'Profile',
+          headerShown: false,
         }}
       />
     </Tabs>

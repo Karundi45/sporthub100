@@ -26,7 +26,7 @@ export default function RegisterScreen() {
       setUser(userData);
       setAuthToken(token);
       
-      router.replace('/(tabs)');
+      router.replace('/(auth)/profile-setup');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Registration failed');
     } finally {
