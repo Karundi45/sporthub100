@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// Replace with your local machine's IP address if testing on a physical device, 
-// or 10.0.2.2 for Android Emulator, or localhost for iOS simulator.
-// Or use your specific local network IP like http://192.168.126.198:5000/api
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.126.198:5000/api';
+const LOCAL_API = 'http://192.168.126.198:5000/api';
+const PROD_API = 'https://sporthub100-1.onrender.com/api';
+
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? LOCAL_API : PROD_API);
 
 const api = axios.create({
   baseURL: API_URL,
