@@ -28,10 +28,11 @@ export const createWorkout = async (req: Request, res: Response): Promise<void> 
       endTime,
     } = req.body;
 
-    if (!route || route.length === 0) {
-      res.status(400).json({ message: 'No route data provided' });
-      return;
-    }
+    // Allow empty route data for stationary workouts (like Yoga, Gym)
+    // if (!route || route.length === 0) {
+    //   res.status(400).json({ message: 'No route data provided' });
+    //   return;
+    // }
 
     const workout = new Workout({
       user: (req as any).user._id,

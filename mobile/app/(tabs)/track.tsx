@@ -165,7 +165,11 @@ export default function TrackingScreen() {
       await api.post('/workouts', {
         title: `${activityType} Session`,
         activityType,
-        route: routeCoordinates,
+        route: routeCoordinates.map(coord => ({
+          latitude: coord.lat,
+          longitude: coord.lng,
+          timestamp: new Date(),
+        })),
         distance: distance,
         duration,
         movingTime: duration,
