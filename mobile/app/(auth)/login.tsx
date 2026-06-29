@@ -3,8 +3,12 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import api, { setAuthToken } from '../../src/services/api';
+import { useThemeStore } from '../../src/store/useThemeStore';
+import { useAppTheme } from '../../src/theme/colors';
 
 export default function LoginScreen() {
+  const { isDark } = useThemeStore();
+  const theme = useAppTheme(isDark);
   const router = useRouter();
   const { setToken, setUser } = useAuthStore();
   const [email, setEmail] = useState('');
@@ -33,25 +37,25 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView 
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <View style={styles.iconPlaceholder} />
-            <Text style={styles.title}>FitTrack Pro</Text>
-            <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+            <View style={[styles.iconPlaceholder, { backgroundColor: theme.primary }]} />
+            <Text style={[styles.title, { color: theme.text }]}>FitTrack Pro</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Sign in to continue your journey</Text>
           </View>
           
           {error ? <Text style={styles.error}>{error}</Text> : null}
           
           <View style={styles.form}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
               placeholder="Email"
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.textSecondary}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -59,21 +63,23 @@ export default function LoginScreen() {
             />
             
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
               placeholder="Password"
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.textSecondary}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
             />
             
-            <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
+            <TouchableOpacity style={[styles.button, { backgroundColor: theme.primary }]} onPress={handleLogin} disabled={loading}>
+              <Text style={[styles.buttonText, { color: isDark ? '#000' : '#fff' }]}>
+                {loading ? 'Logging in...' : 'Sign In'}
+              </Text>
             </TouchableOpacity>
           </View>
           
           <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/register')}>
-            <Text style={styles.linkText}>Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text></Text>
+            <Text style={[styles.linkText, { color: theme.textSecondary }]}>Don't have an account? <Text style={[styles.linkTextBold, { color: theme.primary }]}>Sign Up</Text></Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

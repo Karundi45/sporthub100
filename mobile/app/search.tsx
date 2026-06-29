@@ -40,13 +40,13 @@ export default function SearchScreen() {
     const isFollowing = currentUser?.following?.includes(targetUser._id);
     try {
       if (isFollowing) {
-        await api.post(`/users/${targetUser._id}/unfollow`);
+        await api.put(`/users/${targetUser._id}/unfollow`);
         setUser({
           ...currentUser,
           following: currentUser.following.filter((id: string) => id !== targetUser._id),
         });
       } else {
-        await api.post(`/users/${targetUser._id}/follow`);
+        await api.put(`/users/${targetUser._id}/follow`);
         setUser({
           ...currentUser,
           following: [...(currentUser.following || []), targetUser._id],
@@ -67,7 +67,7 @@ export default function SearchScreen() {
             <Image source={{ uri: item.profilePicture }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarPlaceholderText}>{item.fullName.charAt(0).toUpperCase()}</Text>
+              <Text style={styles.avatarPlaceholderText}>{(item.fullName || item.username || '?').charAt(0).toUpperCase()}</Text>
             </View>
           )}
           <View>

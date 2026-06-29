@@ -32,9 +32,26 @@ export const getUserAnalytics = async (req: AuthRequest, res: Response): Promise
       }
     ]);
 
+    // Aggregate weekly trends (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const weeklyTrends = await Workout.aggregate([
+      { $match: { user: userId, startTime: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$startTime' } },
+          totalDistance: { $sum: '$distance' },
+          totalCalories: { $sum: '$calories' }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
     res.json({
       overall: stats.length > 0 ? stats[0] : { totalDistance: 0, totalDuration: 0, totalCalories: 0, totalWorkouts: 0 },
-      activityDistribution
+      activityDistribution,
+      weeklyTrends
     });
   } catch (error: any) {
     res.status(500).json({ message: error.message });

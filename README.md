@@ -33,8 +33,23 @@ A world-class, production-ready fitness tracking platform built with **React Nat
    This uses `concurrently` to start the Node.js backend (port 5000) and the Expo bundler simultaneously.
 
 ## Deployment
-- **Backend**: Can be deployed to Render, Railway, or Heroku. Ensure environment variables are set.
-- **Mobile**: Use EAS Build (`eas build`) to generate production APK/AAB for Android and IPA for iOS.
+
+### Backend
+Can be deployed to Render, Railway, or Heroku. Ensure environment variables are set in the cloud provider.
+
+### Mobile App (Standalone APK)
+We use EAS (Expo Application Services) to generate production-ready `.apk` and `.aab` files.
+```bash
+cd mobile
+npm run build:apk
+```
+
+### Web App (Vercel)
+The mobile app gracefully degrades (e.g., Maps) for web support. To deploy to Vercel:
+```bash
+cd mobile
+npm run deploy:vercel
+```
 
 ## Contributing
 See individual READMEs in `/backend` and `/mobile` for specific module development instructions.

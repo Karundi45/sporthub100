@@ -1,96 +1,52 @@
 import { Tabs } from 'expo-router';
-import { useEffect } from 'react';
 import { Platform } from 'react-native';
-import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
-import api from '../../src/services/api';
+import { Ionicons } from '@expo/vector-icons';
+import { useThemeStore } from '../../src/store/useThemeStore';
+import { useAppTheme } from '../../src/theme/colors';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
 export default function TabLayout() {
-  useEffect(() => {
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) {
-        api.put('/users/push-token', { pushToken: token }).catch(console.log);
-      }
-    });
-  }, []);
-
-  async function registerForPushNotificationsAsync() {
-    let token;
-
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-    }
-
-    if (Device.isDevice) {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      if (finalStatus !== 'granted') {
-        return;
-      }
-      token = (await Notifications.getExpoPushTokenAsync({ projectId: 'your-project-id' })).data;
-    }
-
-    return token;
-  }
-
+  const { isDark } = useThemeStore();
+  const theme = useAppTheme(isDark);
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: '#007AFF' }}>
+    <Tabs screenOptions={{ 
+      tabBarActiveTintColor: theme.tabBarActive,
+      tabBarInactiveTintColor: theme.tabBarInactive,
+      tabBarStyle: {
+        backgroundColor: theme.tabBar,
+        borderTopWidth: 0,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+      },
+      headerShown: false,
+    }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Track',
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="feed"
-        options={{
           title: 'Feed',
-          headerShown: false,
+          tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="challenges"
+        name="track"
         options={{
-          title: 'Challenges',
-          headerShown: false,
+          title: 'Track',
+          tabBarIcon: ({ color }) => <Ionicons name="location-outline" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="groups"
+        name="social"
         options={{
-          title: 'Groups',
-          headerShown: false,
+          title: 'Social',
+          tabBarIcon: ({ color }) => <Ionicons name="people-outline" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="analytics"
+        name="me"
         options={{
-          title: 'Analytics',
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          headerShown: false,
+          title: 'Me',
+          tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={24} color={color} />,
         }}
       />
     </Tabs>

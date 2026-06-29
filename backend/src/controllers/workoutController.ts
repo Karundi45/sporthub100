@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import Workout from '../models/Workout';
 import User from '../models/User';
+import Challenge from '../models/Challenge';
 
 // @desc    Create new workout
 // @route   POST /api/workouts
@@ -76,8 +77,37 @@ export const createWorkout = async (req: Request, res: Response): Promise<void> 
 
       if (achievementsToAward.length > 0) {
         user.achievements.push(...achievementsToAward);
-        await user.save();
       }
+
+      // Challenge Logic
+      const activeChallenges = await Challenge.find({
+        'participants.user': user._id,
+        startDate: { $lte: new Date() },
+        endDate: { $gte: new Date() },
+      });
+
+      for (const challenge of activeChallenges) {
+        const participant = challenge.participants.find((p: any) => p.user.toString() === user._id.toString());
+        if (participant && !participant.completed) {
+          let increment = 0;
+          if (challenge.type === 'distance') increment = distance || 0;
+          else if (challenge.type === 'calories') increment = calories || 0;
+          else if (challenge.type === 'time') increment = duration || 0;
+          else if (challenge.type === 'elevation') increment = elevationGain || 0;
+
+          if (increment > 0) {
+            participant.progress += increment;
+            if (participant.progress >= challenge.targetValue) {
+              participant.progress = challenge.targetValue;
+              participant.completed = true;
+              user.xp = (user.xp || 0) + challenge.xpReward;
+            }
+            await challenge.save();
+          }
+        }
+      }
+      
+      await user.save();
     }
 
     res.status(201).json(createdWorkout);

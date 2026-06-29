@@ -24,6 +24,8 @@ export interface IUser extends Document {
   following: mongoose.Types.ObjectId[];
   expoPushToken?: string;
   achievements: { title: string, description: string, icon: string, earnedAt: Date }[];
+  xp: number;
+  isPremium: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +60,8 @@ const UserSchema: Schema = new Schema(
       icon: String,
       earnedAt: Date
     }],
+    xp: { type: Number, default: 0 },
+    isPremium: { type: Boolean, default: false },
   },
   {
     timestamps: true,

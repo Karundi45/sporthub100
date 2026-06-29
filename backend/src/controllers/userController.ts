@@ -140,3 +140,29 @@ export const updatePushToken = async (req: Request, res: Response): Promise<void
     res.status(500).json({ message: error.message });
   }
 };
+
+// @desc    Upgrade user to premium
+// @route   POST /api/users/upgrade
+// @access  Private
+export const upgradeUser = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = await User.findById((req as any).user._id);
+    
+    if (user) {
+      user.isPremium = true;
+      const updatedUser = await user.save();
+      
+      res.json({
+        _id: updatedUser._id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        fullName: updatedUser.fullName,
+        isPremium: updatedUser.isPremium,
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+};

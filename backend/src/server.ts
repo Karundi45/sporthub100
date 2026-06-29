@@ -14,7 +14,10 @@ import workoutRoutes from './routes/workoutRoutes';
 import postRoutes from './routes/postRoutes';
 import groupRoutes from './routes/groupRoutes';
 import challengeRoutes from './routes/challengeRoutes';
+import trainingPlanRoutes from './routes/trainingPlanRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
+import notificationRoutes from './routes/notificationRoutes';
+import uploadRoutes from './routes/uploadRoutes';
 
 dotenv.config();
 
@@ -64,7 +67,7 @@ io.on('connection', (socket) => {
 
   socket.on('send_message', (data) => {
     // data should contain { groupId, message }
-    io.to(data.groupId).emit('receive_message', data.message);
+    socket.to(data.groupId).emit('receive_message', data.message);
   });
 
   socket.on('typing', (data) => {
@@ -98,7 +101,10 @@ app.use('/api/workouts', workoutRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/challenges', challengeRoutes);
+app.use('/api/plans', trainingPlanRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Error Handling Middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

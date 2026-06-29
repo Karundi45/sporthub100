@@ -13,7 +13,7 @@ export const createPost = async (req: AuthRequest, res: Response): Promise<void>
       user: req.user._id,
       content,
       photos: photos || [],
-      workout: workout || null,
+      ...(workout ? { workout } : {}),
     });
 
     const populatedPost = await Post.findById(post._id).populate('user', 'username fullName profilePicture');
@@ -68,7 +68,7 @@ export const likePost = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    const isLiked = post.likes.includes(req.user._id);
+    const isLiked = post.likes.some((id: any) => id.toString() === req.user._id.toString());
 
     if (isLiked) {
       post.likes = post.likes.filter((id) => id.toString() !== req.user._id.toString());

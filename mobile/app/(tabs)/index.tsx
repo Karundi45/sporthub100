@@ -1,430 +1,511 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert, SafeAreaView, Platform } from 'react-native';
-import * as Location from 'expo-location';
-import { socketService } from '../../src/services/socket';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, SafeAreaView, Platform, TextInput, ScrollView } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/store/useAuthStore';
-import ActivitySelector from '../../components/ActivitySelector';
 import api from '../../src/services/api';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { io, Socket } from 'socket.io-client';
+import { useThemeStore } from '../../src/store/useThemeStore';
+import { useAppTheme } from '../../src/theme/colors';
 
-let MapView: any = View;
-let Polyline: any = View;
-let UrlTile: any = View;
-let Marker: any = View;
-
-if (Platform.OS !== 'web') {
-  const Maps = require('react-native-maps');
-  MapView = Maps.default;
-  Polyline = Maps.Polyline;
-  UrlTile = Maps.UrlTile;
-  Marker = Maps.Marker;
+interface Post {
+  _id: string;
+  user: { _id: string; username: string; fullName: string; profilePicture: string };
+  content: string;
+  photos: string[];
+  likes: string[];
+  comments: any[];
+  createdAt: string;
+  workout?: any;
 }
 
-export default function TrackingScreen() {
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [route, setRoute] = useState<{latitude: number, longitude: number, timestamp: Date}[]>([]);
-  const [isTracking, setIsTracking] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [activityType, setActivityType] = useState('Running');
-  
-  // Metrics
-  const [distance, setDistance] = useState(0); // in meters
-  const [duration, setDuration] = useState(0); // in seconds
-  const [calories, setCalories] = useState(0);
-  
-  // Real-time
-  const [friendsLocations, setFriendsLocations] = useState<Record<string, { lat: number, lon: number, username: string }>>({});
-  
+export default function FeedScreen() {
+  const { isDark } = useThemeStore();
+  const theme = useAppTheme(isDark);
   const { user } = useAuthStore();
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const mapRef = useRef<any>(null);
+  const queryClient = useQueryClient();
+  const [liveFriends, setLiveFriends] = useState<{[key: string]: any}>({});
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission to access location was denied');
-        return;
-      }
-      let currentLocation = await Location.getCurrentPositionAsync({});
-      setLocation(currentLocation);
-      socketService.connect();
+    const baseUrl = api.defaults.baseURL?.replace('/api', '') || 'http://localhost:5000';
+    const newSocket = io(baseUrl);
+    setSocket(newSocket);
 
-      socketService.socket?.on('friend_location_update', (data: any) => {
-        setFriendsLocations((prev) => ({
-          ...prev,
-          [data.userId]: {
-            lat: data.location.latitude,
-            lon: data.location.longitude,
-            username: data.username,
-          }
-        }));
-      });
-    })();
+    newSocket.on('friend_location_update', (data: any) => {
+      setLiveFriends(prev => ({
+        ...prev,
+        [data.userId]: {
+          username: data.username,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          lastUpdate: new Date(),
+        }
+      }));
+    });
 
     return () => {
-      socketService.socket?.off('friend_location_update');
-      socketService.disconnect();
+      newSocket.off('friend_location_update');
+      newSocket.disconnect();
     };
   }, []);
+  const currentUser = useAuthStore((state) => state.user);
+  const [commentingOn, setCommentingOn] = React.useState<string | null>(null);
+  const [commentText, setCommentText] = React.useState('');
 
-  // Timer for duration
-  useEffect(() => {
-    if (isTracking && !isPaused) {
-      timerRef.current = setInterval(() => {
-        setDuration((prev) => prev + 1);
-      }, 1000);
-    } else if (timerRef.current) {
-      clearInterval(timerRef.current);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['feed'],
+    queryFn: async () => {
+      const res = await api.get('/posts/feed');
+      return res.data;
     }
+  });
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isTracking, isPaused]);
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      const res = await api.get('/notifications');
+      return res.data;
+    },
+    refetchInterval: 10000,
+  });
 
-  // Location Tracking
-  useEffect(() => {
-    let locationSubscription: Location.LocationSubscription | null = null;
+  const unreadCount = notifications?.filter((n: any) => !n.read).length || 0;
 
-    if (isTracking && !isPaused) {
-      (async () => {
-        locationSubscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.BestForNavigation,
-            timeInterval: 2000,
-            distanceInterval: 5,
-          },
-          (newLocation) => {
-            setLocation(newLocation);
-            const newPoint = {
-              latitude: newLocation.coords.latitude,
-              longitude: newLocation.coords.longitude,
-              timestamp: new Date(),
-            };
-            
-            setRoute((prev) => {
-              if (prev.length > 0) {
-                const lastPoint = prev[prev.length - 1];
-                const d = getDistanceFromLatLonInM(
-                  lastPoint.latitude, lastPoint.longitude,
-                  newPoint.latitude, newPoint.longitude
-                );
-                setDistance((prevDist) => prevDist + d);
-                // Simple calorie estimation: roughly 0.06 calories per meter
-                setCalories((prevCal) => prevCal + (d * 0.06));
-              }
-              return [...prev, newPoint];
-            });
-
-            if (socketService.socket && user) {
-              socketService.socket.emit('update_location', {
-                userId: user._id,
-                username: user.username,
-                location: newPoint,
-              });
-            }
-          }
-        );
-      })();
+  const likeMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      await api.put(`/posts/${postId}/like`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
     }
+  });
 
-    return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
-    };
-  }, [isTracking, isPaused]);
+  const commentMutation = useMutation({
+    mutationFn: async ({ postId, text }: { postId: string; text: string }) => {
+      await api.post(`/posts/${postId}/comment`, { text });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      setCommentingOn(null);
+      setCommentText('');
+    }
+  });
 
-  // Haversine formula for distance
-  function getDistanceFromLatLonInM(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371e3; // Radius of the earth in m
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1); 
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    return R * c; // Distance in m
+  if (isLoading) {
+    return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
   }
 
-  function deg2rad(deg: number) {
-    return deg * (Math.PI/180);
+  if (error) {
+    return <View style={styles.center}><Text style={styles.errorText}>Error loading feed.</Text></View>;
   }
 
-  const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const handleLike = (postId: string) => {
+    likeMutation.mutate(postId);
   };
 
-  const calculatePace = () => {
-    if (distance === 0 || duration === 0) return '0:00';
-    const distanceKm = distance / 1000;
-    const minutesPerKm = (duration / 60) / distanceKm;
-    const mins = Math.floor(minutesPerKm);
-    const secs = Math.floor((minutesPerKm - mins) * 60);
-    if (mins > 60) return '--:--';
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleStart = () => {
-    setIsTracking(true);
-    setIsPaused(false);
-    setRoute([]);
-    setDistance(0);
-    setDuration(0);
-    setCalories(0);
-  };
-
-  const handlePause = () => {
-    setIsPaused(true);
-  };
-
-  const handleResume = () => {
-    setIsPaused(false);
-  };
-
-  const handleStop = async () => {
-    setIsTracking(false);
-    setIsPaused(false);
-
-    if (route.length < 2) {
-      Alert.alert('Workout too short', 'This workout was too short to save.');
-      return;
+  const handleCommentSubmit = (postId: string) => {
+    if (commentText.trim()) {
+      commentMutation.mutate({ postId, text: commentText });
     }
+  };
 
-    try {
-      await api.post('/workouts', {
-        title: `${activityType} Session`,
-        activityType,
-        route,
-        distance,
-        duration,
-        movingTime: duration,
-        calories: Math.round(calories),
-        startTime: route[0].timestamp,
-        endTime: new Date(),
-      });
-      Alert.alert('Success', 'Workout saved successfully!');
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Failed to save workout to the server.');
-    }
+  const renderItem = ({ item }: { item: Post }) => {
+    const isLiked = item.likes.includes(currentUser?._id);
+
+    return (
+      <View style={[styles.card, { backgroundColor: theme.surface, shadowColor: isDark ? 'transparent' : '#000' }]}>
+        <View style={styles.header}>
+          <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
+            <Text style={[styles.avatarText, { color: isDark ? '#000' : '#fff' }]}>{item.user.username.charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={styles.headerText}>
+            <Text style={[styles.name, { color: theme.text }]}>{item.user.fullName}</Text>
+            <Text style={[styles.time, { color: theme.textSecondary }]}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+          </View>
+        </View>
+        
+        {item.content ? <Text style={[styles.content, { color: theme.text }]}>{item.content}</Text> : null}
+        
+        {item.workout && (
+          <View style={[styles.workoutEmbed, { backgroundColor: theme.background, borderLeftColor: theme.success }]}>
+            <Text style={[styles.workoutTitle, { color: theme.text }]}>Completed: {item.workout.title}</Text>
+            <Text style={[styles.workoutStats, { color: theme.textSecondary }]}>
+              {(item.workout.distance / 1000).toFixed(2)} km in {Math.floor(item.workout.duration / 60)} mins
+            </Text>
+          </View>
+        )}
+
+        {item.photos && item.photos.length > 0 && (
+          <Image source={{ uri: item.photos[0] }} style={[styles.image, { backgroundColor: theme.background }]} />
+        )}
+        
+        <View style={[styles.footer, { borderTopColor: theme.border }]}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => handleLike(item._id)}>
+            <Text style={[styles.actionText, isLiked ? { color: theme.error } : { color: theme.textSecondary }]}>
+              {isLiked ? '❤️' : '🤍'} {item.likes.length} Likes
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton} onPress={() => setCommentingOn(commentingOn === item._id ? null : item._id)}>
+            <Text style={[styles.actionText, { color: theme.textSecondary }]}>💬 {item.comments?.length || 0} Comments</Text>
+          </TouchableOpacity>
+        </View>
+
+        {item.comments && item.comments.length > 0 && (
+          <View style={[styles.commentsList, { borderTopColor: theme.border }]}>
+            {item.comments.slice(0, 3).map((comment: any, index: number) => (
+              <View key={index} style={styles.commentItem}>
+                <Text style={[styles.commentUser, { color: theme.text }]}>{comment.user?.username}: </Text>
+                <Text style={[styles.commentTextContent, { color: theme.text }]}>{comment.text}</Text>
+              </View>
+            ))}
+            {item.comments.length > 3 && (
+              <Text style={[styles.moreComments, { color: theme.textSecondary }]}>View all {item.comments.length} comments</Text>
+            )}
+          </View>
+        )}
+
+        {commentingOn === item._id && (
+          <View style={[styles.commentInputRow, { borderTopColor: theme.border }]}>
+            <TextInput
+              style={[styles.commentInput, { backgroundColor: theme.background, color: theme.text }]}
+              placeholder="Add a comment..."
+              placeholderTextColor={theme.textSecondary}
+              value={commentText}
+              onChangeText={setCommentText}
+              autoFocus
+            />
+            <TouchableOpacity onPress={() => handleCommentSubmit(item._id)} style={styles.postCommentButton}>
+              <Text style={[styles.postCommentText, { color: theme.primary }]}>Post</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
   };
 
   return (
-    <View style={styles.container}>
-      <MapView 
-        ref={mapRef}
-        style={styles.map} 
-        provider={null} // Null provider allows standard map tiles on both iOS and Android
-        showsUserLocation={true}
-        followsUserLocation={isTracking && !isPaused}
-        initialRegion={location ? {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        } : undefined}
-      >
-        {Platform.OS !== 'web' && (
-          <UrlTile
-            urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            maximumZ={19}
-            flipY={false}
-          />
-        )}
-        <Polyline coordinates={route} strokeColor="#007AFF" strokeWidth={6} lineCap="round" lineJoin="round" />
-        
-        {Object.values(friendsLocations).map((friend, index) => (
-          Platform.OS !== 'web' && (
-            <Marker
-              key={index}
-              coordinate={{ latitude: friend.lat, longitude: friend.lon }}
-              title={friend.username}
-              description="Live Tracking"
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <View style={styles.container}>
+        <View style={styles.headerContainer}>
+          <Text style={[styles.largeTitle, { color: theme.text }]}>Activity</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity 
+              style={styles.bellButton}
+              onPress={() => router.push('/notifications')}
             >
-              <View style={styles.friendMarker}>
-                <Text style={styles.friendMarkerText}>{friend.username.charAt(0).toUpperCase()}</Text>
-              </View>
-            </Marker>
-          )
-        ))}
-      </MapView>
-
-      <SafeAreaView style={styles.overlay} pointerEvents="box-none">
-        <View style={styles.topStats}>
-          <Text style={styles.title}>GPS Tracker</Text>
-          {!isTracking && (
-            <ActivitySelector 
-              selectedActivity={activityType} 
-              onSelectActivity={setActivityType} 
-              disabled={isTracking}
-            />
-          )}
-        </View>
-
-        <View style={styles.bottomControls}>
-          <View style={styles.statsPanel}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{(distance / 1000).toFixed(2)}</Text>
-              <Text style={styles.statLabel}>KM</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{calculatePace()}</Text>
-              <Text style={styles.statLabel}>PACE (/KM)</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{formatTime(duration)}</Text>
-              <Text style={styles.statLabel}>TIME</Text>
-            </View>
-          </View>
-
-          {!isTracking ? (
-            <TouchableOpacity style={styles.mainButton} onPress={handleStart} activeOpacity={0.8}>
-              <Text style={styles.buttonText}>START</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.trackingControls}>
-              {isPaused ? (
-                <TouchableOpacity style={[styles.mainButton, styles.resumeButton]} onPress={handleResume}>
-                  <Text style={styles.buttonText}>RESUME</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={[styles.mainButton, styles.pauseButton]} onPress={handlePause}>
-                  <Text style={styles.buttonText}>PAUSE</Text>
-                </TouchableOpacity>
+              <Ionicons name="notifications-outline" size={24} color={theme.text} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
               )}
-              
-              <TouchableOpacity style={[styles.mainButton, styles.stopButton]} onPress={handleStop}>
-                <Text style={styles.buttonText}>STOP</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.createButton, { backgroundColor: theme.primary }]} 
+              onPress={() => router.push('/create-post')}
+            >
+              <Text style={[styles.createButtonText, { color: isDark ? '#000' : '#fff' }]}>+ Post</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </SafeAreaView>
-    </View>
+
+        {Object.keys(liveFriends).length > 0 && (
+          <View style={styles.liveSection}>
+            <Text style={styles.liveSectionTitle}>🔴 Live Now</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {Object.entries(liveFriends).map(([id, friend]: [string, any]) => (
+                <View key={id} style={styles.liveAvatarContainer}>
+                  <View style={[styles.liveAvatar, { backgroundColor: theme.primary, borderColor: theme.error }]}>
+                    <Text style={[styles.liveAvatarText, { color: isDark ? '#000' : '#fff' }]}>{friend.username.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <Text style={[styles.liveUsername, { color: theme.text }]}>{friend.username}</Text>
+                  <View style={[styles.liveBadge, { backgroundColor: theme.error, borderColor: theme.surface }]} />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <FlatList
+          data={data?.posts || []}
+          keyExtractor={(item) => item._id}
+          renderItem={renderItem}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No posts yet. Follow friends or go for a run!</Text>
+            </View>
+          }
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    justifyContent: 'space-between',
-  },
-  topStats: {
+    paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 40 : 10,
   },
-  title: {
+  largeTitle: {
     fontSize: 34,
     fontWeight: '700',
     color: '#000',
-    paddingHorizontal: 20,
-    textShadowColor: 'rgba(255, 255, 255, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: 0.5,
   },
-  bottomControls: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    alignItems: 'center',
-  },
-  statsPanel: {
+  headerContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 20,
-    padding: 20,
-    width: '100%',
-    marginBottom: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  statItem: {
-    flex: 1,
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 15,
   },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#8E8E93',
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  divider: {
-    width: 1,
-    height: '100%',
-    backgroundColor: '#E5E5EA',
-  },
-  trackingControls: {
+  headerRight: {
     flexDirection: 'row',
-    gap: 20,
+    alignItems: 'center',
+    gap: 15,
   },
-  mainButton: {
-    width: 86,
-    height: 86,
-    borderRadius: 43,
+  bellButton: {
+    position: 'relative',
+    padding: 4,
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF3B30',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    backgroundColor: '#34C759', // Apple Green
   },
-  pauseButton: {
-    backgroundColor: '#FF9500', // Orange
-  },
-  resumeButton: {
-    backgroundColor: '#34C759',
-  },
-  stopButton: {
-    backgroundColor: '#FF3B30', // Apple Red
-  },
-  buttonText: {
+  badgeText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: 'bold',
   },
-  friendMarker: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#FF9500',
+  createButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  createButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+  },
+  errorText: {
+    color: '#FF3B30',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  headerText: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+  },
+  time: {
+    fontSize: 13,
+    color: '#3A3A3C',
+    marginTop: 8,
+  },
+  liveSection: {
+    marginBottom: 15,
+  },
+  liveSectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF3B30',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  liveAvatarContainer: {
+    alignItems: 'center',
+    marginRight: 15,
+    position: 'relative',
+  },
+  liveAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
+    borderColor: '#FF3B30',
+  },
+  liveAvatarText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  liveUsername: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  liveBadge: {
+    position: 'absolute',
+    bottom: 20,
+    right: 0,
+    width: 14,
+    height: 14,
+    backgroundColor: '#FF3B30',
+    borderRadius: 7,
+    borderWidth: 2,
     borderColor: '#fff',
   },
-  friendMarkerText: {
-    color: '#fff',
+  content: {
+    fontSize: 15,
+    color: '#333',
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  image: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: '#E5E5EA',
+  },
+  footer: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#C6C6C8',
+    paddingTop: 12,
+  },
+  actionButton: {
+    marginRight: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionText: {
+    fontSize: 15,
+    color: '#8E8E93',
+    fontWeight: '500',
+  },
+  likedText: {
+    color: '#FF3B30',
+  },
+  workoutEmbed: {
+    backgroundColor: '#F2F2F7',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#34C759',
+  },
+  workoutTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000',
+  },
+  workoutStats: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 4,
+  },
+  commentsList: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5EA',
+  },
+  commentItem: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  commentUser: {
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  commentTextContent: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  moreComments: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 4,
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5EA',
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  postCommentButton: {
+    marginLeft: 12,
+  },
+  postCommentText: {
+    color: '#007AFF',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#8E8E93',
+    fontSize: 16,
   },
 });

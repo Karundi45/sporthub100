@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { useAuthStore } from '../src/store/useAuthStore';
+import { useThemeStore } from '../src/store/useThemeStore';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -21,6 +22,7 @@ export default function RootLayout() {
   });
 
   const { token } = useAuthStore();
+  const { isDark } = useThemeStore();
   const segments = useSegments();
   const router = useRouter();
 
@@ -54,14 +56,16 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <ThemeProvider value={DefaultTheme}>
+        <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
           <Stack>
             <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
             <Stack.Screen name="(auth)/register" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="create-post" options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen name="notifications" options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen name="+not-found" />
           </Stack>
-          <StatusBar style="auto" />
+          <StatusBar style={isDark ? "light" : "dark"} />
         </ThemeProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>

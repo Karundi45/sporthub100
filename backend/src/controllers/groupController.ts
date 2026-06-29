@@ -41,13 +41,13 @@ export const joinGroup = async (req: AuthRequest, res: Response): Promise<void> 
       return;
     }
 
-    if (group.members.includes(req.user._id)) {
+    if (group.members.some((id: any) => id.toString() === req.user._id.toString())) {
       res.status(400).json({ message: 'Already a member' });
       return;
     }
 
     if (group.isPrivate) {
-      if (!group.joinRequests.includes(req.user._id)) {
+      if (!group.joinRequests.some((id: any) => id.toString() === req.user._id.toString())) {
         group.joinRequests.push(req.user._id);
         await group.save();
       }
@@ -67,7 +67,7 @@ import Message from '../models/Message';
 
 export const getMessages = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const messages = await Message.find({ group: new mongoose.Types.ObjectId(req.params.id as string) })
+    const messages = await Message.find({ group: req.params.id })
       .populate('sender', 'username fullName profilePicture')
       .sort({ createdAt: 1 })
       .limit(100);
@@ -81,7 +81,7 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
   try {
     const { text } = req.body;
     const message = await Message.create({
-      group: new mongoose.Types.ObjectId(req.params.id as string),
+      group: req.params.id,
       sender: req.user._id,
       text,
     });

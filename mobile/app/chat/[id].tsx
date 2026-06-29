@@ -2,11 +2,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { io, Socket } from 'socket.io-client';
-import api from '../../../src/services/api';
-import { useAuthStore } from '../../../src/store/useAuthStore';
+import api, { API_URL } from '../../src/services/api';
+import { useAuthStore } from '../../src/store/useAuthStore';
+import { useThemeStore } from '../../src/store/useThemeStore';
+import { useAppTheme } from '../../src/theme/colors';
 
-// Assuming server runs on localhost:5000 in dev
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = API_URL.replace('/api', '');
 
 interface Message {
   _id: string;
@@ -16,7 +17,10 @@ interface Message {
 }
 
 export default function ChatScreen() {
+  const { isDark } = useThemeStore();
+  const theme = useAppTheme(isDark);
   const { id } = useLocalSearchParams();
+  const groupId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.user);
   
@@ -25,25 +29,27 @@ export default function ChatScreen() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const flatListRef = useRef<FlatList>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
     // Fetch initial messages
     const fetchMessages = async () => {
       try {
-        const res = await api.get(`/groups/${id}/messages`);
+        const res = await api.get(`/groups/${groupId}/messages`);
         setMessages(res.data);
       } catch (error) {
         console.error('Failed to fetch messages', error);
       }
     };
-    fetchMessages();
+    if (groupId) {
+      fetchMessages();
+    }
 
     // Initialize Socket
     socketRef.current = io(SOCKET_URL);
     
     socketRef.current.on('connect', () => {
-      socketRef.current?.emit('join_group', id);
+      socketRef.current?.emit('join_group', groupId);
     });
 
     socketRef.current.on('receive_message', (message: Message) => {
@@ -65,23 +71,24 @@ export default function ChatScreen() {
     });
 
     return () => {
-      socketRef.current?.emit('leave_group', id);
+      socketRef.current?.emit('leave_group', groupId);
       socketRef.current?.disconnect();
     };
-  }, [id]);
+  }, [groupId]);
 
   const handleSend = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || !groupId) return;
     
     try {
-      const res = await api.post(`/groups/${id}/messages`, { text: inputText });
+      const res = await api.post(`/groups/${groupId}/messages`, { text: inputText });
       const newMessage = res.data;
       
-      socketRef.current?.emit('send_message', { groupId: id, message: newMessage });
-      socketRef.current?.emit('stop_typing', { groupId: id, username: currentUser?.username });
+      setMessages((prev) => [...prev, newMessage]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+
+      socketRef.current?.emit('send_message', { groupId, message: newMessage });
+      socketRef.current?.emit('stop_typing', { groupId, username: currentUser?.username });
       
-      // The sender also receives via socket, but to avoid double we can handle it server-side. 
-      // For simplicity, we just clear the input here.
       setInputText('');
     } catch (error) {
       console.error('Failed to send message', error);
@@ -91,12 +98,12 @@ export default function ChatScreen() {
   const handleTyping = (text: string) => {
     setInputText(text);
     
-    if (socketRef.current) {
-      socketRef.current.emit('typing', { groupId: id, username: currentUser?.username });
+    if (socketRef.current && groupId) {
+      socketRef.current.emit('typing', { groupId, username: currentUser?.username });
       
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        socketRef.current?.emit('stop_typing', { groupId: id, username: currentUser?.username });
+        socketRef.current?.emit('stop_typing', { groupId, username: currentUser?.username });
       }, 2000);
     }
   };
@@ -104,9 +111,9 @@ export default function ChatScreen() {
   const renderMessage = ({ item }: { item: Message }) => {
     const isMe = item.sender._id === currentUser?._id;
     return (
-      <View style={[styles.messageBubble, isMe ? styles.myMessage : styles.theirMessage]}>
-        {!isMe && <Text style={styles.senderName}>{item.sender.username}</Text>}
-        <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
+      <View style={[styles.messageBubble, isMe ? { backgroundColor: theme.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 } : { backgroundColor: theme.surface, alignSelf: 'flex-start', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: theme.border }]}>
+        {!isMe && <Text style={[styles.senderName, { color: theme.textSecondary }]}>{item.sender.username}</Text>}
+        <Text style={[isMe ? { color: isDark ? '#000' : '#fff', fontSize: 16 } : { color: theme.text, fontSize: 16 }]}>
           {item.text}
         </Text>
       </View>
@@ -114,17 +121,17 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView 
         style={styles.container} 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backText}>‹ Back</Text>
+            <Text style={[styles.backText, { color: theme.primary }]}>‹ Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Group Chat</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Group Chat</Text>
           <View style={{ width: 50 }} />
         </View>
 
@@ -138,21 +145,22 @@ export default function ChatScreen() {
         />
 
         {typingUsers.length > 0 && (
-          <Text style={styles.typingText}>
+          <Text style={[styles.typingText, { color: theme.textSecondary }]}>
             {typingUsers.join(', ')} {typingUsers.length > 1 ? 'are' : 'is'} typing...
           </Text>
         )}
 
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
             value={inputText}
             onChangeText={handleTyping}
             placeholder="Message..."
+            placeholderTextColor={theme.textSecondary}
             multiline
           />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Text style={styles.sendButtonText}>Send</Text>
+          <TouchableOpacity style={[styles.sendButton, { backgroundColor: theme.primary }]} onPress={handleSend}>
+            <Text style={[styles.sendButtonText, { color: isDark ? '#000' : '#fff' }]}>Send</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

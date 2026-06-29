@@ -3,8 +3,12 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import api, { setAuthToken } from '../../src/services/api';
+import { useThemeStore } from '../../src/store/useThemeStore';
+import { useAppTheme } from '../../src/theme/colors';
 
 export default function RegisterScreen() {
+  const { isDark } = useThemeStore();
+  const theme = useAppTheme(isDark);
   const router = useRouter();
   const { setToken, setUser } = useAuthStore();
   const [username, setUsername] = useState('');
@@ -35,41 +39,41 @@ export default function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView 
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.content}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join FitTrack Pro today</Text>
+            <Text style={[styles.title, { color: theme.text }]}>Create Account</Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Join FitTrack Pro today</Text>
           </View>
           
           {error ? <Text style={styles.error}>{error}</Text> : null}
           
           <View style={styles.form}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
               placeholder="Full Name"
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.textSecondary}
               value={fullName}
               onChangeText={setFullName}
             />
 
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
               placeholder="Username"
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.textSecondary}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
             />
             
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
               placeholder="Email"
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.textSecondary}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -77,23 +81,25 @@ export default function RegisterScreen() {
             />
             
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
               placeholder="Password"
-              placeholderTextColor="#8E8E93"
+              placeholderTextColor={theme.textSecondary}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
             />
             
-            <TouchableOpacity style={styles.button} onPress={handleRegister} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
+            <TouchableOpacity style={[styles.button, { backgroundColor: theme.primary }]} onPress={handleRegister} disabled={loading}>
+              <Text style={[styles.buttonText, { color: isDark ? '#000' : '#fff' }]}>
+                {loading ? 'Creating account...' : 'Sign Up'}
+              </Text>
             </TouchableOpacity>
           </View>
           
           <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/login')}>
-            <Text style={styles.linkText}>Already have an account? <Text style={styles.linkTextBold}>Sign In</Text></Text>
+            <Text style={[styles.linkText, { color: theme.textSecondary }]}>Already have an account? <Text style={[styles.linkTextBold, { color: theme.primary }]}>Sign In</Text></Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -107,10 +113,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingVertical: 40,
   },
   header: {
     marginBottom: 40,
