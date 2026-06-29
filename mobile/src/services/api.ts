@@ -1,9 +1,10 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 
 const LOCAL_API = 'http://192.168.126.198:5000/api';
 const PROD_API = 'https://sporthub100-1.onrender.com/api';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__ ? LOCAL_API : PROD_API);
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' ? PROD_API : LOCAL_API);
 
 const api = axios.create({
   baseURL: API_URL,
