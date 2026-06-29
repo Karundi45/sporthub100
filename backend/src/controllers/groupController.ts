@@ -67,7 +67,7 @@ import Message from '../models/Message';
 
 export const getMessages = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const messages = await Message.find({ group: req.params.id })
+    const messages = await Message.find({ group: req.params.id as any })
       .populate('sender', 'username fullName profilePicture')
       .sort({ createdAt: 1 })
       .limit(100);
@@ -81,7 +81,7 @@ export const sendMessage = async (req: AuthRequest, res: Response): Promise<void
   try {
     const { text } = req.body;
     const message = await Message.create({
-      group: req.params.id,
+      group: req.params.id as any,
       sender: req.user._id,
       text,
     });
